@@ -79,7 +79,7 @@ show_name: true
 ### Avanceret "Menu Kort"
 Hvis du vil have det til at ligne en rigtig restaurant-menu (kræver at du installerer `Mushroom Cards` fra HACS).
 
-![Dashboard Eksempel](images/dashboard.png)
+![Dashboard Eksempel](images/MenuDashboardPreview.png)
 
 ```yaml
 type: vertical-stack
