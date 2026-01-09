@@ -154,6 +154,7 @@ action:
       message: "{{ states('sensor.teamblue_kitchen_dagens_ret') }}"
       data:
         image: "{{ state_attr('sensor.teamblue_kitchen_dagens_ret', 'entity_picture') }}"
+```
 
 ### Alarm: Livretter på menuen
 Få besked, når menuen opdateres (f.eks. fredag), hvis din livret er på menuen i den kommende uge.
