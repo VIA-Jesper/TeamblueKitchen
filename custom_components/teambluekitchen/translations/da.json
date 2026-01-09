@@ -1,0 +1,17 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Konfigurer Teamblue Køkken",
+                "description": "Indtast din API nøgle for at forbinde.",
+                "data": {
+                    "api_key": "API Nøgle",
+                    "api_url": "API URL (Valgfri)"
+                }
+            }
+        },
+        "abort": {
+            "already_configured": "Kontoen er allerede konfigureret"
+        }
+    }
+}
