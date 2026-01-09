@@ -11,14 +11,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN, CONF_API_KEY, CONF_API_URL, DEFAULT_API_URL
+from .const import DOMAIN, CONF_API_URL, DEFAULT_API_URL
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_API_KEY): str,
-        vol.Optional(CONF_API_URL, default=DEFAULT_API_URL): str,
+        vol.Required(CONF_API_URL, default=DEFAULT_API_URL): str,
     }
 )
 

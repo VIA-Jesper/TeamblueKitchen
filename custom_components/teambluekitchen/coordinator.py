@@ -17,10 +17,9 @@ STORAGE_VERSION = 1
 class TeamblueCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the API."""
 
-    def __init__(self, hass: HomeAssistant, session, api_key: str, api_url: str):
+    def __init__(self, hass: HomeAssistant, session, api_url: str):
         """Initialize."""
         self.session = session
-        self.api_key = api_key
         self.api_url = api_url
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._data_cache = None
@@ -50,18 +49,10 @@ class TeamblueCoordinator(DataUpdateCoordinator):
             await self._async_load_cache()
 
         try:
-            headers = {"Authorization": f"Bearer {self.api_key}"}
             # Depending on API, auth might be header or query param. 
-            # User said "api key", often means header or ?api_key=. 
-            # I'll assume header for now or simple custom header.
-            # If user didn't specify, I will put it in typical places.
-            # Actually, let's put it in a header 'X-Api-Key' or similar if they didn't specify.
-            # But standard is often just a query param or bearer. 
-            # Let's try to add it to headers as 'api_key' for now, or X-Api-Key.
-            # Wait, `sensor.py` didn't show any auth logic.
-            # I will use a simple header "Authorization": key.
+            # User removed api key requirement.
             
-            async with self.session.get(self.api_url, headers={"Authorization": self.api_key}) as response:
+            async with self.session.get(self.api_url) as response:
                 if response.status == 401:
                     # Try alternate if needed? Or just fail.
                     pass

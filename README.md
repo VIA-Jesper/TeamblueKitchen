@@ -32,8 +32,7 @@ En Home Assistant integration til at vise menuen fra Teamblue kantinen, samt ind
 1. Gå til **Indstillinger** -> **Enheder og tjenester**.
 2. Klik **Tilføj integration**.
 3. Søg efter **Teamblue Kitchen**.
-4. Indtast din API nøgle (hvis påkrævet, ellers efterlad tomt eller skriv hvad som helst).
-   - *Bemærk: API'et kræver pt. ikke auth, men feltet er der for fremtidig brug.*
+4. Bekræft eller ret API URL'en.
 
 ## Sensorer
 
