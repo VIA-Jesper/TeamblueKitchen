@@ -38,9 +38,9 @@ En Home Assistant integration til at vise menuen fra Teamblue kantinen, samt ind
 
 Integrationen opretter følgende sensorer:
 
-*   `sensor.teamblue_todays_meal` (Dagens Ret)
-*   `sensor.teamblue_week_plan` (Ugeplan - se attributter for detaljer)
-*   `sensor.teamblue_freezer_count` (Antal retter i fryseren)
+*   `sensor.teamblue_kitchen_dagens_ret` (Dagens Ret)
+*   `sensor.teamblue_kitchen_ugeplan` (Ugeplan - se attributter for detaljer)
+*   `sensor.teamblue_kitchen_fryser_indhold` (Antal retter i fryseren)
 
 ## Dashboard Eksempler
 
@@ -55,7 +55,7 @@ title: 🍽️ Ugeplan
 content: |
   {% set days = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag'] %}
   {% for day in days %}
-    {% set dish = state_attr('sensor.teamblue_week_plan', day) %}
+    {% set dish = state_attr('sensor.teamblue_kitchen_ugeplan', day) %}
     {% if dish %}
   **{{day}}**
   {{ dish }}
@@ -70,7 +70,7 @@ Da sensoren automatisk genererer et billede af retten, kan du bruge et helt simp
 
 ```yaml
 type: picture-entity
-entity: sensor.teamblue_todays_meal
+entity: sensor.teamblue_kitchen_dagens_ret
 name: Dagens Ret
 show_state: true
 show_name: true
@@ -79,19 +79,51 @@ show_name: true
 ### Avanceret "Menu Kort"
 Hvis du vil have det til at ligne en rigtig restaurant-menu (kræver at du installerer `Mushroom Cards` fra HACS).
 
+![Dashboard Eksempel](images/dashboard.png)
+
 ```yaml
 type: vertical-stack
 cards:
   - type: custom:mushroom-title-card
-    title: "Kantinen"
-    subtitle: "Dagens ret og ugeplan"
+    title: Kantinen
+    subtitle: Dagens ret og ugeplan
   - type: custom:mushroom-template-card
-    primary: "{{ states('sensor.teamblue_todays_meal') }}"
-    secondary: "Dagens Ret"
-    icon: mdi:food-turkey
+    primary: "{{ states('sensor.teamblue_kitchen_dagens_ret') }}"
+    secondary: Dagens Ret
     icon_color: orange
-    picture: "{{ state_attr('sensor.teamblue_todays_meal', 'entity_picture') }}"
     layout: vertical
+    card_mod:
+      style: |
+        ha-card {
+          position: relative;
+          background-image: url("{{ state_attr('sensor.teamblue_kitchen_dagens_ret', 'entity_picture') }}");
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          min-height: 200px;
+          color: white;
+        }
+        ha-card::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: rgba(0,0,0,0.4);  /* opacity 0.4 = 40% */
+          z-index: 0;
+        }
+        ha-card > * {
+          position: relative;
+          z-index: 1;
+        }
+  - type: markdown
+    content: |
+      ### 📅 Ugeplan
+      {% set days = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag'] %}
+      {% for day in days %}
+        {% set dish = state_attr('sensor.teamblue_kitchen_ugeplan', day) %}
+        {% if dish %}
+      **{{day}}**: {{ dish }}
+        {% endif %}
+      {% endfor %}
 ```
 
 ## Automatiseringer
@@ -119,9 +151,9 @@ action:
   - service: notify.mobile_app_din_telefon
     data:
       title: "🍴 Dagens Ret"
-      message: "{{ states('sensor.teamblue_todays_meal') }}"
+      message: "{{ states('sensor.teamblue_kitchen_dagens_ret') }}"
       data:
-        image: "{{ state_attr('sensor.teamblue_todays_meal', 'entity_picture') }}"
+        image: "{{ state_attr('sensor.teamblue_kitchen_dagens_ret', 'entity_picture') }}"
 
 ### Alarm: Livretter på menuen
 Få besked, når menuen opdateres (f.eks. fredag), hvis din livret er på menuen i den kommende uge.
@@ -131,13 +163,13 @@ alias: "Kantine: Livretter Alarm"
 description: "Giver besked hvis der er Lasagne eller Kødsovs på menuen"
 trigger:
   - platform: state
-    entity_id: sensor.teamblue_week_plan
+    entity_id: sensor.teamblue_kitchen_ugeplan
 condition:
   - condition: template
     value_template: >
       {# Ret dine livretter herunder, adskilt af | #}
       {% set favorites = 'Lasagne|Kødsovs|Boller i karry' %}
-      {% set dishes = state_attr('sensor.teamblue_week_plan', 'dishes') %}
+      {% set dishes = state_attr('sensor.teamblue_kitchen_ugeplan', 'dishes') %}
       
       {# Tjekker om en af retterne matcher #}
       {{ dishes | select('search', favorites, ignorecase=True) | list | length > 0 }}
