@@ -6,8 +6,10 @@ En Home Assistant integration til at vise menuen fra Teamblue kantinen, samt ind
 
 ## Funktioner
 
-- **Dagens Ret**: Viser hvad der er til frokost i dag.
-- **Ugeplan**: Gemmer ugeplanen lokalt, så du kan se hele ugen selvom API'et kun viser fremadrettet.
+- **Dagens Ret**: Viser hvad der er til frokost i dag. Skifter automatisk hver dag kl. 00:01.
+- **AI-genereret Billede**: Hver ret får sit eget unikke billede genereret af AI, der passer til menuen.
+- **Ugeplan**: Gemmer ugeplanen lokalt i `.storage`, så du kan se hele ugen (mandag-fredag), selvom API'et efterhånden fjerner de overståede dage.
+- **Smart Oprydning**: Fjerner automatisk menu-punkter, der er mere end 7 dage gamle, så du aldrig ser forældet data (f.eks. efter ferier).
 - **Fryser**: Viser antal og liste over retter, der kan købes i fryseren.
 
 ## Installation
@@ -38,9 +40,16 @@ En Home Assistant integration til at vise menuen fra Teamblue kantinen, samt ind
 
 Integrationen opretter følgende sensorer:
 
-*   `sensor.teamblue_kitchen_dagens_ret` (Dagens Ret)
-*   `sensor.teamblue_kitchen_ugeplan` (Ugeplan - se attributter for detaljer)
-*   `sensor.teamblue_kitchen_fryser_indhold` (Antal retter i fryseren)
+*   `sensor.teamblue_kitchen_dagens_ret`: Statustekst med navnet på dagens ret. Har AI-billedet i `entity_picture` attributten.
+*   `sensor.teamblue_kitchen_ugeplan`: En oversigt over ugen. Brug attributterne (Mandag, Tirsdag osv.) til at vise menuen på dit dashboard.
+*   `sensor.teamblue_kitchen_fryser_indhold`: Viser antallet af retter i fryseren.
+
+## Opdateringslogik
+
+For at belaste API'et mindst muligt og give den bedste brugeroplevelse, fungerer opdateringerne således:
+- **Kl. 00:01 hver nat**: Integrationen vågner og henter den nyeste menu fra API'et.
+- **Ved genstart af HA**: Integrationen henter friske data med det samme.
+- **Smart Lager**: Menuen gemmes lokalt. Hvis API'et er nede, vises den sidst kendte menu stadigvæk.
 
 ## Dashboard Eksempler
 
@@ -186,12 +195,11 @@ action:
 ## FAQ / Tips
 
 **Hvordan tvinger jeg en opdatering?**
-Da integrationen kun henter data hver 24. time, kan du tvinge en ny hentning ved at gå til:
+Integrationen opdaterer automatisk ved genstart af Home Assistant. Du kan også tvinge en opdatering ved at gå til:
 *Indstillinger -> Enheder og tjenester -> Teamblue Kitchen -> Klik på de tre prikker -> "Genindlæs"*
+
+**Hvorfor ser ugeplanen tom ud?**
+Hvis der ikke er retter for den nuværende uge i API'et, og de gemte data er mere end 7 hverdage gamle, bliver ugeplanen ryddet. Det sker typisk under ferier eller lukkeperioder.
 
 **Hvorfor ser maden mærkelig ud på billedet?**
 Billederne genereres ("tegnes") af en kunstig intelligens (AI) baseret på rettens navn. Den gør sit bedste, men nogle gange kan danske retter se lidt fantasifulde ud. Det er en del af charmen! 🤖🎨
-
-**Data mangler?**
-Hvis API'et ikke har frigivet næste uges menu endnu, vil ugeplanen være tom eller vise den nuværende uge indtil opdateringen sker.
-```

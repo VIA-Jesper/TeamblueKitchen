@@ -53,8 +53,15 @@ class TodaysMealSensor(BaseSensor):
 
     @property
     def native_value(self) -> str:
-        """Return the state of the sensor."""
-        return self.coordinator.data.get("todays_meal", "Ingen data")
+        """Return the state of the sensor based on current date."""
+        week_plan = self.coordinator.data.get("week_plan", [])
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        for item in week_plan:
+            if item.get("date") == today:
+                return item.get("dish", "Ingen ret fundet")
+                
+        return "Ingen menu i dag"
 
     @property
     def entity_picture(self) -> str | None:

@@ -6,6 +6,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.event import async_track_time_change
 
 from .const import DOMAIN
 
@@ -28,8 +29,22 @@ class TeamblueCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(hours=24),
+            update_interval=None, # We use a manual schedule instead
         )
+
+        # Schedule update every day at 00:01
+        async_track_time_change(
+            self.hass,
+            self._async_scheduled_update,
+            hour=0,
+            minute=1,
+            second=0,
+        )
+
+    async def _async_scheduled_update(self, _now=None):
+        """Trigger update at scheduled time."""
+        _LOGGER.debug("Running scheduled midnight update for TeamblueKitchen")
+        await self.async_request_refresh()
 
     async def _async_load_cache(self):
         """Load data from storage."""
@@ -48,90 +63,66 @@ class TeamblueCoordinator(DataUpdateCoordinator):
         if self._data_cache is None:
             await self._async_load_cache()
 
+        fresh_items = self._data_cache.get("items", [])
+        
         try:
-            # Depending on API, auth might be header or query param. 
-            # User removed api key requirement.
-            
-            async with self.session.get(self.api_url) as response:
-                if response.status == 401:
-                    # Try alternate if needed? Or just fail.
-                    pass
+            async with self.session.get(self.api_url, timeout=10) as response:
                 response.raise_for_status()
                 fresh_data = await response.json()
+                
+                # Check for changes
+                data_changed = False
+                
+                # Update freezer
+                fresh_items = fresh_data.get("items", [])
+                if self._data_cache.get("items") != fresh_items:
+                    self._data_cache["items"] = fresh_items
+                    data_changed = True
+
+                # Merge week plan
+                fresh_week_plan = fresh_data.get("week_plan", [])
+                if isinstance(self._data_cache.get("week_plan"), list):
+                     self._data_cache["week_plan"] = {}
+
+                cached_plan = self._data_cache["week_plan"]
+                current_date = datetime.now().date()
+
+                # Clean old data: Remove anything older than 7 days
+                cutoff_date = current_date - timedelta(days=7)
+                dates_to_remove = [
+                    d_str for d_str in cached_plan
+                    if datetime.strptime(d_str, "%Y-%m-%d").date() < cutoff_date
+                ]
+                for d in dates_to_remove:
+                    del cached_plan[d]
+                    data_changed = True
+
+                # Add/Update fresh data and check if it actually changes anything
+                for item in fresh_week_plan:
+                    date_str = item.get("date")
+                    if date_str:
+                        if cached_plan.get(date_str) != item:
+                            cached_plan[date_str] = item
+                            data_changed = True
+
+                if data_changed:
+                    self._data_cache["week_plan"] = cached_plan
+                    await self._async_save_cache()
+                    _LOGGER.info("TeamblueKitchen data updated and saved")
 
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}")
+            _LOGGER.warning("Could not update TeamblueKitchen from API, using cached data: %s", err)
+            if not self._data_cache.get("week_plan") and not self._data_cache.get("items"):
+                raise UpdateFailed(f"API down and no cached data available: {err}")
 
-        # fresh_data expected structure:
-        # {
-        #   "days": [ {"date": "2023-10-23", "dish": "Pasta"} ], 
-        #   "freezer": [ ... ]
-        # }
-        # Note: I am guessing the structure based on the previous sensor.py (which used 'week_plan' and 'items')
-        
-        # Merge Logic
-        fresh_week_plan = fresh_data.get("week_plan", [])
-        fresh_items = fresh_data.get("items", []) # Freezer items likely don't need history, just current state.
-
-        # Update freezer directly
-        self._data_cache["items"] = fresh_items
-
-        # Merge week plan
-        # We want to keep days from the current week that might have fallen off the API response.
-        # But we also don't want to keep data from last year.
-        # Strategy: 
-        # 1. Identify the current ISO week.
-        # 2. Filter our cache to only keep days that belong to the current week (or future).
-        # 3. Update with fresh data.
-        
-        current_date = datetime.now().date()
-        current_iso_week = current_date.isocalendar()[1]
-        
-        # Convert cache list to dict for easier merging by date
-        # Check if cache is list or dict (from previous saves)
-        # We will store week_plan as a DICT in the cache: "YYYY-MM-DD": {data}
-        if isinstance(self._data_cache.get("week_plan"), list):
-             # Migration from list to dict if needed (or just reset)
-             self._data_cache["week_plan"] = {}
-
-        cached_plan = self._data_cache["week_plan"]
-
-        # Clean old weeks
-        dates_to_remove = []
-        for date_str in cached_plan:
-            try:
-                d = datetime.strptime(date_str, "%Y-%m-%d").date()
-                if d.isocalendar()[1] != current_iso_week and d < current_date:
-                    dates_to_remove.append(date_str)
-            except ValueError:
-                dates_to_remove.append(date_str)
-        
-        for d in dates_to_remove:
-            del cached_plan[d]
-
-        # Add/Update fresh data
-        for item in fresh_week_plan:
-            date_str = item.get("date")
-            if date_str:
-                cached_plan[date_str] = item
-
-        # Save back to disk
-        self._data_cache["week_plan"] = cached_plan
-        await self._async_save_cache()
-        
-        # Return structured data for sensors
-        # Convert dict back to sorted list for the sensor to consume easily
+        # Always process what we have in cache
+        cached_plan = self._data_cache.get("week_plan", {})
         sorted_plan = sorted(cached_plan.values(), key=lambda x: x.get("date", "9999-99-99"))
         
-        # Use API's todays_meal if available, otherwise try to find it in the plan
-        api_todays_meal = fresh_data.get("todays_meal")
-        if not api_todays_meal:
-            api_todays_meal = self._get_today_meal(sorted_plan)
-
         return {
             "week_plan": sorted_plan,
-            "items": fresh_items,
-            "todays_meal": api_todays_meal
+            "items": self._data_cache.get("items", []),
+            "todays_meal": self._get_today_meal(sorted_plan)
         }
 
     def _get_today_meal(self, week_plan):
